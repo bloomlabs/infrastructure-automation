@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<body style="margin:0;">
+<meta charset="utf-8">
+<style>
+
+* {
+  font-family: 'Muli', sans-serif;
+  font-size: 8px;
+}
+
+#title, #month {
+  text-align:center;
+  width:1080px;
+  font-size: 50pt;
+}
+
+</style>
+<link href='http://fonts.googleapis.com/css?family=Muli' rel='stylesheet' type='text/css'>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<script src='//ajax.googleapis.com/ajax/libs/jquery/1.2.6/jquery.min.js' type='text/javascript'></script>
+<div id="title">Last 30 days in Lab</div>
+<script>
+
+var w = 1080,
+    h = 1115;
+
+var largest = -1;
+
+function daysInMonth(month,year) {
+    return new Date(year, month, 0).getDate();
+}
+
+function convert(data) {
+  children = [{"name":"root", "radius": 0}];
+  exclusions = ['display', 'guest'];//, 'ash', 'johnclema'];
+
+  data.ranking.forEach(function(e) {
+
+    if (exclusions.indexOf(e.username) == -1) {
+      name = e.username;
+
+      if ("name" in e) {
+        name = e.name;
+      }
+
+      name = name + "<br>" + e.days;
+
+      mthDays = daysInMonth(new Date().getMonth() + 1, new Date().getYear());
+
+      children.push({"name": name, "radius": Math.sqrt(e.days) * 30});
+    }
+  });
+
+  return children;
+}
+
+var color = d3.scale.category20c();
+
+var svg = d3.select("body").append("svg:svg")
+    .attr("width", w)
+    .attr("height", h)
+    .append('g');
+
+d3.json("http://radius/ranking.json", function(error, root) {
+//d3.json("/ranking-static2.json", function(error, root) {
+  console.log(root);
+  var nodes = convert(root);
+
+var force = d3.layout.force()
+    .gravity(0.05)
+    .charge(function(d, i) { return i ? 0 : -2000; })
+    .nodes(nodes)
+    .size([w, h]);
+
+var root = nodes[0];
+root.radius = 0;
+root.fixed = true;
+
+svg.selectAll("circle")
+    .data(nodes)
+  .enter().append("g")
+      .attr("class", "circle");
+
+  svg.selectAll("g").append("svg:circle")
+    .attr("r", function(d) { return d.radius; })
+    .style("fill", function(d, i) { return color(d.radius); });
+
+      svg.selectAll("g").append('foreignObject')
+    .attr('style', 'z-index: 2;')
+    .attr('width', function(d) {return d.radius*2;})
+    .attr('height', function(d) {return d.radius*2;})
+    .attr("transform", function(d) {return "translate(" + ((-d.radius)+((d.radius*2)/100)*2.5) + "," + ((-d.radius)+((d.radius*2)/100)*2.5) + ")"; })
+    .append("xhtml:body")
+    .attr("style", "margin:0;")
+    .html(function(d){return '<div style="text-align: center;width: '+((d.radius*2)/100)*95+'px; height: '+((d.radius*2)/100)*95+'px; line-height: '+((d.radius*2)/100)*95+'px;overflow:hidden;"><span style="  display: inline-block;vertical-align: middle;line-height: normal;font-size:'+d.radius*3.8+'%">'+d.name+'</span></div>'});
+
+
+force.start();
+
+force.on("tick", function(e) {
+  var q = d3.geom.quadtree(nodes),
+      i = 0,
+      n = nodes.length;
+
+  while (++i < n) {
+    q.visit(collide(nodes[i]));
+  }
+
+  svg.selectAll("g")
+    .attr("transform", function(d) { 
+          return "translate(" + d.x + "," + d.y + ")"; });
+});
+
+
+var t = 0;
+
+setInterval(function poke() {
+  root.px = 600 * Math.cos(t) + 600;
+  root.py = 600 * Math.sin(t) + 600;
+  t += 0.05;
+  force.resume();
+},40);
+
+});
+
+
+function collide(node) {
+  var r = node.radius + 16,
+      nx1 = node.x - r,
+      nx2 = node.x + r,
+      ny1 = node.y - r,
+      ny2 = node.y + r;
+  return function(quad, x1, y1, x2, y2) {
+    if (quad.point && (quad.point !== node)) {
+      var x = node.x - quad.point.x,
+          y = node.y - quad.point.y,
+          l = Math.sqrt(x * x + y * y),
+          r = node.radius + quad.point.radius;
+      if (l < r) {
+        l = (l - r) / l * .5;
+        node.x -= x *= l;
+        node.y -= y *= l;
+        quad.point.x += x;
+        quad.point.y += y;
+      }
+    }
+    return x1 > nx2
+        || x2 < nx1
+        || y1 > ny2
+        || y2 < ny1;
+  };
+}
+
+
+//d3.select(self.frameElement).style("height", 1200 + "px");
+
+</script>
+</body>
+</html>
