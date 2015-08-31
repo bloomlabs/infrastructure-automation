@@ -26,15 +26,15 @@ with cnx.cursor() as cursor:
 			elif lastname:
 				uname_map[username] = lastname
 
-logs = [open(CUR_DIR + "radius.log", encoding="UTF-8")]
+logs = [open(CUR_DIR + "radius.log", encoding="UTF-8", errors="ignore")]
 
 entries = []
 
 for path in glob.iglob(CUR_DIR + "radius.log.[0-9].gz"):
-	logs.append(gzip.open(path, 'rt', encoding="UTF-8"))
+	logs.append(gzip.open(path, 'rt', encoding="UTF-8", errors="ignore"))
 
 for path in glob.iglob(CUR_DIR + "radius.log.[0-9]"):
-	logs.append(open(path, 'r', encoding="UTF-8"))
+	logs.append(open(path, 'r', encoding="UTF-8", errors="ignore"))
 
 for flog in logs:
 	for line in flog:
@@ -43,6 +43,7 @@ for flog in logs:
 			time = datetime.datetime.strptime(match.group(1), "%a %b %d %H:%M:%S %Y") # Sun Jun 14 03:38:36 2015
 			user = match.group(2)
 			entries.append((time, user))
+
 
 dates_users = []
 
@@ -54,7 +55,7 @@ for date, records in itertools.groupby(entries, lambda x: datetime.date(x[0].yea
 	dates_users.append((date, users))
 
 rolling_count = {}
-for date, users in dates_users[:30]:
+for date, users in dates_users[-30:]:
 	for user in users:
 		if user not in rolling_count.keys():
 			rolling_count[user] = 0
