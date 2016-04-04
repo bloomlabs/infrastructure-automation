@@ -1,5 +1,7 @@
 import datetime
 import os
+import logging
+import collections
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -10,19 +12,31 @@ from requests.auth import HTTPBasicAuth
 
 from config import *
 
+logging.basicConfig(format='[%(asctime)s] %(levelname)s: %(message)s', level=logging.DEBUG)
+logging.info('Starting sync')
+
+logging.debug('Connecting to database')
 e = create_engine("mysql://{}:{}@{}/{}".format(DB_USER, DB_PASS, DB_HOST, DB_NAME))
+e.connect()
+
+logging.debug('Constructing session')
 s = Session(bind=e)
 
+logging.debug('Querying Bloom Memberships API')
 r = requests.get('https://{}/api/users'.format(HOST), headers={'Authorization': 'Token {}'.format(TOKEN)})
 
 if r.status_code != 200:
-	exit('Panic!')
+	logging.error('API query caused status code {} instead of expected 200'.format(r.status_code))
 
+
+counters = collections.defaultdict(int)
+
+logging.debug('Beginning iteration')
 for data in r.json()['users']:
 	username = data['wifi_username']
 
 	if s.query(UserInfo).filter(UserInfo.username == username, UserInfo.creationby != 'memberships-sync').count():
-		print('WARNING: Skipped {}, as existing unmanaged user with same name'.format(username))
+		logging.warning('Skipped {}, as existing unmanaged user with same name'.format(username))
 		continue
 
 	u = s.query(UserInfo).filter_by(username=username, creationby='memberships-sync').first()
@@ -43,9 +57,11 @@ for data in r.json()['users']:
 
 			s.commit()
 
-			print('Updated {}'.format(username))
+			logging.debug('Updated {}'.format(username))
+			counters['updated'] += 1
 		else:
-			print('Skipped {} as is unchanged'.format(username))
+			logging.debug('Skipped {} as is unchanged'.format(username))
+			counters['skipped_unchanged'] += 1
 
 	# If pre-existing user who is disabled, we delete their UserInfo and password
 	elif u and not data['wifi_access?']:
@@ -53,7 +69,8 @@ for data in r.json()['users']:
 			s.delete(rc)
 		s.delete(u)
 
-		print('Deleted {}'.format(username))
+		logging.debug('Deleted {}'.format(username))
+		counters['deleted'] += 1
 
 	# If new user who is enabled and has set their wifi password, we create their account
 	elif not u and data['wifi_access?'] and data['wifi_password']:
@@ -76,8 +93,12 @@ for data in r.json()['users']:
 		s.add(rc)
 		s.commit()
 
-		print('Created {}'.format(username))
+		logging.debug('Created {}'.format(username))
+		counters['created'] += 1
 
 	else:
-		print('Skipped {} as is inactive/disabled'.format(username))
+		logging.debug('Skipped {} as is inactive/disabled'.format(username))
+		counters['skipped_inactive'] += 1
 
+logging.info('Stats: ' + ', '.join('{}: {}'.format(t, c) for t, c in counters.items()))
+logging.info('Sync completed')
