@@ -8,12 +8,7 @@ from models import *
 import requests
 from requests.auth import HTTPBasicAuth
 
-TOKEN = os.environ['BLOOM_API_TOKEN']
-HOST = os.environ['BLOOM_API_HOST']
-DB_USER = os.environ['RADIUS_DB_USER']
-DB_PASS = os.environ['RADIUS_DB_PASS']
-DB_NAME = os.environ['RADIUS_DB_NAME']
-DB_HOST = os.environ['RADIUS_DB_HOST']
+from config import *
 
 e = create_engine("mysql://{}:{}@{}/{}".format(DB_USER, DB_PASS, DB_HOST, DB_NAME))
 s = Session(bind=e)

@@ -1,0 +1,6 @@
+TOKEN 	= 'something'
+HOST 	= 'something'
+DB_USER = 'something'
+DB_PASS = 'something'
+DB_NAME = 'something'
+DB_HOST = 'something'
