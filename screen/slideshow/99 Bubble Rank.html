@@ -14,10 +14,15 @@
   font-size: 50pt;
 }
 
+#container {
+  transform-origin: 50% 50%;
+  -webkit-transition: 2s ease-in-out;
+}
+
 </style>
 <link href='http://fonts.googleapis.com/css?family=Muli' rel='stylesheet' type='text/css'>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
-<script src='//ajax.googleapis.com/ajax/libs/jquery/1.2.6/jquery.min.js' type='text/javascript'></script>
+<script src='http://ajax.googleapis.com/ajax/libs/jquery/1.2.6/jquery.min.js' type='text/javascript'></script>
 <div id="title">Last 30 days in Lab</div>
 <script>
 
@@ -59,33 +64,35 @@ var color = d3.scale.category20c();
 var svg = d3.select("body").append("svg:svg")
     .attr("width", w)
     .attr("height", h)
-    .append('g');
+    .append('g')
+    .attr('id', 'container');
+
+var prev_scale = 1;
 
 d3.json("http://radius/ranking.json", function(error, root) {
-//d3.json("/ranking-static2.json", function(error, root) {
   console.log(root);
   var nodes = convert(root);
 
-var force = d3.layout.force()
-    .gravity(0.05)
-    .charge(function(d, i) { return i ? 0 : -2000; })
-    .nodes(nodes)
-    .size([w, h]);
+  var force = d3.layout.force()
+      .gravity(0.05)
+      .charge(function(d, i) { return i ? 0 : -200; })
+      .nodes(nodes)
+      .size([w, h]);
 
-var root = nodes[0];
-root.radius = 0;
-root.fixed = true;
+  var root = nodes[0];
+  root.radius = 0;
+  root.fixed = true;
 
-svg.selectAll("circle")
-    .data(nodes)
-  .enter().append("g")
-      .attr("class", "circle");
+  svg.selectAll("circle")
+    .data(nodes.slice(1))
+    .enter().append("g")
+    .attr("class", "circle");
 
   svg.selectAll("g").append("svg:circle")
     .attr("r", function(d) { return d.radius; })
     .style("fill", function(d, i) { return color(d.radius); });
 
-      svg.selectAll("g").append('foreignObject')
+  svg.selectAll("g").append('foreignObject')
     .attr('style', 'z-index: 2;')
     .attr('width', function(d) {return d.radius*2;})
     .attr('height', function(d) {return d.radius*2;})
@@ -95,31 +102,57 @@ svg.selectAll("circle")
     .html(function(d){return '<div style="text-align: center;width: '+((d.radius*2)/100)*95+'px; height: '+((d.radius*2)/100)*95+'px; line-height: '+((d.radius*2)/100)*95+'px;overflow:hidden;"><span style="  display: inline-block;vertical-align: middle;line-height: normal;font-size:'+d.radius*3.8+'%">'+d.name+'</span></div>'});
 
 
-force.start();
+  force.start();
 
-force.on("tick", function(e) {
-  var q = d3.geom.quadtree(nodes),
-      i = 0,
-      n = nodes.length;
+  force.on("tick", function(e) {
+    var q = d3.geom.quadtree(nodes),
+        i = 0,
+        n = nodes.length;
 
-  while (++i < n) {
-    q.visit(collide(nodes[i]));
-  }
+    while (++i < n) {
+      q.visit(collide(nodes[i]));
+    }
 
-  svg.selectAll("g")
-    .attr("transform", function(d) { 
-          return "translate(" + d.x + "," + d.y + ")"; });
-});
+    svg.selectAll("g")
+      .attr("transform", function(d) { 
+            return "translate(" + d.x + "," + d.y + ")"; });
+  });
 
 
-var t = 0;
+  var t = 0;
 
-setInterval(function poke() {
-  root.px = 600 * Math.cos(t) + 600;
-  root.py = 600 * Math.sin(t) + 600;
-  t += 0.05;
-  force.resume();
-},40);
+  setInterval(function poke() {
+    root.px = 600 * Math.cos(t) + 600;
+    root.py = 600 * Math.sin(t) + 600;
+    t += 0.05;
+    force.resume();
+  },40);
+
+  setInterval(function resize() {
+    var cont = $('#container')[0];
+    var tw = cont.getBoundingClientRect().width;
+    var th = cont.getBoundingClientRect().height;
+
+    var scale_w = w / tw - (((w / tw) / 100) * 20);
+    var scale_h = h / th - (((h / th) / 100) * 20);
+
+    var s = scale_w;
+    if (scale_h > scale_w) {
+      scale = scale_h;
+    }
+
+    s = prev_scale * s;
+
+    if (Math.abs((s - prev_scale) / Math.abs(prev_scale)) < 0.05) {
+      return; // If our scaling is < 5% change, just don't bother
+
+    }
+
+    prev_scale = s;
+
+    cont.setAttribute('style', 'transform: scale('+s+','+s+')')
+
+  },10000);
 
 });
 
