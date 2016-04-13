@@ -41,7 +41,7 @@ for flog in logs:
 		match = logex.match(line)		
 		if match:
 			time = datetime.datetime.strptime(match.group(1), "%a %b %d %H:%M:%S %Y") # Sun Jun 14 03:38:36 2015
-			user = match.group(2)
+			user = match.group(2).lower()
 			entries.append((time, user))
 
 
