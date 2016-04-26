@@ -1,7 +1,10 @@
 import datetime
 import os
 import logging
-import collections
+
+# Fix for SNI problems on older Python versions
+import urllib3.contrib.pyopenssl
+urllib3.contrib.pyopenssl.inject_into_urllib3()
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -12,7 +15,7 @@ from requests.auth import HTTPBasicAuth
 
 from config import *
 
-logging.basicConfig(format='[%(asctime)s] %(levelname)s: %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='[%(asctime)s] %(levelname)s: %(message)s', level=logging.INFO)
 logging.info('Starting sync')
 
 logging.debug('Connecting to database')
@@ -29,7 +32,7 @@ if r.status_code != 200:
 	logging.error('API query caused status code {} instead of expected 200'.format(r.status_code))
 
 
-counters = collections.defaultdict(int)
+counters = {v : 0 for v in ['updated', 'skipped_unchanged', 'skipped_inactive', 'deleted', 'created']}
 
 logging.debug('Beginning iteration')
 for data in r.json()['users']:
@@ -57,7 +60,7 @@ for data in r.json()['users']:
 
 			s.commit()
 
-			logging.debug('Updated {}'.format(username))
+			logging.info('Updated {}'.format(username))
 			counters['updated'] += 1
 		else:
 			logging.debug('Skipped {} as is unchanged'.format(username))
@@ -69,7 +72,7 @@ for data in r.json()['users']:
 			s.delete(rc)
 		s.delete(u)
 
-		logging.debug('Deleted {}'.format(username))
+		logging.info('Deleted {}'.format(username))
 		counters['deleted'] += 1
 
 	# If new user who is enabled and has set their wifi password, we create their account
@@ -93,7 +96,7 @@ for data in r.json()['users']:
 		s.add(rc)
 		s.commit()
 
-		logging.debug('Created {}'.format(username))
+		logging.info('Created {}'.format(username))
 		counters['created'] += 1
 
 	else:
