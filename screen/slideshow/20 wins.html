@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+    	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js" integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.17.1/moment.min.js"></script>
+        <style type="text/css">
+        .wins {
+            font-size: 1.25em;
+        }
+		.date {
+			text-align: right;
+		}
+		.win {
+			text-align: center;
+		}
+        </style>
+    </head>
+    <body>
+    	<h2 style="text-align: center; color: black;">#Wins</h2><hr>
+        <div id="wins" class="container wins justify-content-center"></div>
+        <script>
+        var chanid = "";
+        var tok = "";
+        var wins = [];
+        var dirty = false;
+        var latest = "";
+        var user_cache = {};
+        function redisplayWins() {
+            var d = $("#wins")[0];
+            d.innerHTML = ""; 
+            for (var i = 0; i < wins.length && i < 20; i++) {
+                var container = document.createElement("DIV");
+                container.className = "row";
+                var nameContainer = document.createElement("DIV");
+                nameContainer.className = "username col-3";
+                var nameContent = document.createTextNode(wins[i][0]);
+                nameContainer.appendChild(nameContent);
+                container.appendChild(nameContainer);
+
+                var nameContainer = document.createElement("DIV");
+                nameContainer.className = "win col-6 justify-content-md-center";
+                container.appendChild(nameContainer);
+                nameContainer.id = i;
+
+                var nameContainer = document.createElement("DIV");
+                nameContainer.className = "date col-3";
+                var nameContent = document.createTextNode(wins[i][2]);
+                nameContainer.appendChild(nameContent);
+                container.appendChild(nameContainer);
+                d.appendChild(container);
+                $("#" + i).text(wins[i][1]);
+            }
+        }
+        function getCreds() {
+            return $.getJSON("http://localhost:80/slack_creds.json").then(function (data) {
+                tok = data['token'];
+                chanid = data['wins_channel_id'];
+                console.log('Got creds: ' + tok + ' ' + chanid);
+            });
+        }
+        function getUser(id) {
+            if (user_cache[id]) {
+                return Promise.resolve(user_cache[id]);
+            }
+            return $.getJSON("https://slack.com/api/users.info?token="+tok+"&user=" + id).then(function (data) {
+                if (!data["ok"]) return "";
+                var name = data.user["real_name"];
+                if (data.user.profile.title) {
+                    name += " (" + data.user.profile.title + ")";
+                }
+                user_cache[id] = name;
+                return name;
+            });
+        }
+        function fetchMessageHistory(ts) { 
+            var url = "https://slack.com/api/channels.history?token="+tok+"&channel="+chanid+"&latest=" + ts;
+            return $.getJSON(url, function(data) {
+                if (!data["ok"]) return;
+                $.each(data["messages"], function(i, e) {
+                    if (i === 0) {
+                        latest = e.ts;
+                    }
+                    if (e.type !== "message" || !e.text || e.subtype === "channel_join" || !e.text.startsWith("#win:") || (latest && latest > e.ts)) return;
+                    var user = e.user;
+                    var text = e.text.replace("#win:", "").trim();
+					if (text.length > 200) {
+						text = text.substring(0, 197) + '...';
+					}
+                    var date = new Date();
+                    date.setTime(parseInt(e.ts) * 1000);
+                    getUser(user).then(function(name) {
+                        wins.push([name, text, moment(date).format('Mo of MMM')]);
+                        dirty = true;
+                    });
+                });
+                if (data["has_more"] === true) {
+                    fetchMessageHistory(latest);
+                }
+            });
+        }
+        getCreds().then(function() { 
+            fetchMessageHistory(latest).then(function() {
+                if (dirty) {
+                    dirty = false;
+                    redisplayWins();
+                }
+            });
+            setInterval(function () {
+                fetchMessageHistory(latest).then(function() {
+                    if (dirty) {
+                        dirty = false;
+                        redisplayWins();
+                    }
+                });
+            }, 1000);
+        });
+        </script>
+    </body>
+</html>
