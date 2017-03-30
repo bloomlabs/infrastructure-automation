@@ -1,17 +1,19 @@
+#!/usr/bin/env python3
 # Parses freeradius authentication logs to generate stats about presence in lab
 # Configure in crontab to write to http://<website>/ranking.json to be read by bubble-rank.html
 # Using Python 3.3+
-import gzip, glob, datetime, re, itertools, json
+import gzip, glob, datetime, re, itertools, json, subprocess
 
-CUR_DIR = "/var/log/freeradius/"
+CUR_DIR = "/root/infrastructure-automation/lab-ranking/radiuslogs/"
 logex = re.compile("^(.*?) : Auth: Login OK: \[(.*?)\] .*?$")
 
 uname_map = {}
+subprocess.call(["/root/infrastructure-automation/lab-ranking/radius_log_copy.sh"])
 with open('/root/infrastructure-automation/wifi-credential-sync/user_mapping.json') as input:
 	uname_map = json.loads(input.read())
-	for key in uname_map:
-		firstname = uname_map[key]['firstname']
-		lastname = uname_map[key]['lastname']
+	for username in uname_map:
+		firstname = uname_map[username]['firstname']
+		lastname = uname_map[username]['lastname']
 		if firstname or lastname:
 			if firstname and lastname:
 				uname_map[username]['name'] = firstname + " " + lastname

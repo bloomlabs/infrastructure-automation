@@ -39,7 +39,7 @@ body, div, ul, li {
 
 <p id="guest-pw">
 <?php 
-  $contents = @file_get_contents("http://router:81/guest_password.txt");
+  $contents = @file_get_contents("http://192.168.1.11/guest_password.txt");
   if ($contents === false) {
     echo "Ask one of our volunteers for the Guest Wifi password!";
   } else {
