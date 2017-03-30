@@ -2,29 +2,23 @@
 # Configure in crontab to write to http://<website>/ranking.json to be read by bubble-rank.html
 # Using Python 3.3+
 import gzip, glob, datetime, re, itertools, json
-import pymysql.cursors
-from auth_secret import * # Import RADIUS_USER and RADIUS_PASS
 
 CUR_DIR = "/var/log/freeradius/"
 logex = re.compile("^(.*?) : Auth: Login OK: \[(.*?)\] .*?$")
 
-cnx = pymysql.connect(user=RADIUS_USER, password=RADIUS_PASS,
-                              host='127.0.0.1',
-                              database='radiusdb')
 uname_map = {}
-with cnx.cursor() as cursor:
-	cursor = cnx.cursor()
-	cursor.execute("SELECT username, firstname, lastname FROM userinfo")
-	for username, firstname, lastname in cursor.fetchall():
-		username = username.lower()
-
+with open('/root/infrastructure-automation/wifi-credential-sync/user_mapping.json') as input:
+	uname_map = json.loads(input.read())
+	for key in uname_map:
+		firstname = uname_map[key]['firstname']
+		lastname = uname_map[key]['lastname']
 		if firstname or lastname:
 			if firstname and lastname:
-				uname_map[username] = firstname + " " + lastname
+				uname_map[username]['name'] = firstname + " " + lastname
 			elif firstname:
-				uname_map[username] = firstname
+				uname_map[username]['name'] = firstname
 			elif lastname:
-				uname_map[username] = lastname
+				uname_map[username]['name'] = lastname
 
 logs = [open(CUR_DIR + "radius.log", encoding="UTF-8", errors="ignore")]
 
@@ -68,8 +62,8 @@ for username, days in rolling_count.items():
 	record['username'] = username
 	record['days'] = days
 
-	if username in uname_map:
-		record['name'] = uname_map[username]
+	if username in uname_map and 'name' in uname_map[username]:
+		record['name'] = uname_map[username]['name']
 
 	output.append(record)
 
