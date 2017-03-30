@@ -44,7 +44,7 @@ for data in r.json()['users']:
 	if u and data['wifi_access?']:
 		users.remove(u)
 		pw = u[2]
-		user_name_mapping[u[0]] = {'firstname': data['firstname'], 'lastname': data['lastname']}
+		user_name_mapping[u[1]] = {'firstname': data['firstname'], 'lastname': data['lastname']}
 		# If data has actually changed, we update the database
 		if pw != data['wifi_password']:
 			try:
